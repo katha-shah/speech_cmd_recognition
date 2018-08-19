@@ -49,7 +49,7 @@ class AudioData(object):
             wav_label = np.zeros(num_classes)
             wav_label[label] = 1
             #print(wav_label)
-            wav_data = np.array([self.mfcc(wav_file=wav_f, label=wav_label) for wav_f in wav_files[:3]])
+            wav_data = np.array([self.mfcc(wav_file=wav_f, label=wav_label) for wav_f in wav_files])
             #print(wav_data.shape)
             data = np.concatenate((data, wav_data))
 
@@ -58,9 +58,6 @@ class AudioData(object):
 
 
 def main():
-
-    num_classes = len(audio_classes)
-
     wave_data = AudioData()
     data = wave_data.get_train_test_data(train_data_path, audio_classes)
 
