@@ -1,6 +1,10 @@
 from config import *
 
+
 class AudioData(object):
+
+    def __init__(self):
+        self.X_train, self.X_test, self.y_train, self.y_test = [], [], [], []
 
     def mfcc(self, wav_file, label):
         """
@@ -26,8 +30,13 @@ class AudioData(object):
             wav_files = [os.path.join(dirpath, f) for f in files if fnmatch(f, "*.wav")]
         return wav_files
 
-    def get_train_test_data(self, parent_path, audio_classes=[]):
-
+    def process_train_test_data(self, parent_path, audio_classes=[], test_size=0.33):
+        """
+        Generates train test data
+        :param parent_path:
+        :param audio_classes:
+        :return: None
+        """
         num_classes = len(audio_classes)
         if num_classes < 2:
             print("Error: Min 2 classes required.")
@@ -48,26 +57,65 @@ class AudioData(object):
             # label = 3 [3] [0 0 1]
             wav_label = np.zeros(num_classes)
             wav_label[label] = 1
-            #print(wav_label)
+            # print(wav_label)
             wav_data = np.array([self.mfcc(wav_file=wav_f, label=wav_label) for wav_f in wav_files])
-            #print(wav_data.shape)
+            # print(wav_data.shape)
             data = np.concatenate((data, wav_data))
 
-        #print(data.shape)
-        return data
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(data[:, :NUM_MFCC_SAMPLES],
+                                                                                data[:, NUM_MFCC_SAMPLES:],
+                                                                                test_size=test_size)
 
+    def get_next_train_batch(self):
+        """
+        Batches on training data in circular fashion
+        :return: (X_batch, y_batch) feature batch and label batch
+        """
+        batch_gen = self.get_next_train_batch()
+        X_batch, y_batch = next(batch_gen)
+        return X_batch, y_batch
+
+    def train_batch_gen(self):
+        """
+        Batches on training data in circular fashion
+        :return: (X_batch, y_batch) feature batch and label batch
+        """
+        #if self.X_train:
+            #raise ValueError("Missing training data!")
+        #if not self.y_train:
+            #raise ValueError("Missing label data!")
+        start_indx = 0
+        num_train_entries = len(self.X_train)
+
+        while True:
+            if start_indx > num_train_entries - BATCH_SIZE:
+                X_batch = np.concatenate(
+                    (self.X_train[start_indx:], self.X_train[:BATCH_SIZE - (num_train_entries - start_indx)]))
+                y_batch = np.concatenate(
+                    (self.y_train[start_indx:], self.y_train[:BATCH_SIZE - (num_train_entries - start_indx)]))
+
+            else:
+                X_batch = self.X_train[start_indx: start_indx + BATCH_SIZE]
+                y_batch = self.y_train[start_indx: start_indx + BATCH_SIZE]
+            yield (X_batch, y_batch)
+            start_indx = (start_indx + BATCH_SIZE) % num_train_entries
+
+    def get_test_data(self):
+        """
+        :return:
+        """
+        return (self.X_test, self.y_test)
 
 def main():
     wave_data = AudioData()
-    data = wave_data.get_train_test_data(train_data_path, audio_classes)
+    wave_data.process_train_test_data(train_data_path, audio_classes)
 
-    X_train, X_test, y_train, y_test = train_test_split(data[:, :NUM_MFCC_SAMPLES], data[:, NUM_MFCC_SAMPLES: ], test_size=0.33)
-    X_train = X_train.reshape(-1, NUM_MFCC_SAMPLES)
-    X_test = X_test.reshape(-1, NUM_MFCC_SAMPLES)
-    y_train = y_train.reshape(-1, num_classes)
-    y_test = y_test.reshape(-1, num_classes)
+    g = wave_data.train_batch_gen()
+    for _ in range(10):
+        x,y = next(g)
+        print(x,y)
+        print("--"*10)
 
-    print(y_train,y_test)
 
 
 if __name__ == "__main__":
